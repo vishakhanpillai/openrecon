@@ -3,6 +3,9 @@ import whois
 import requests
 import tldextract
 import dns.resolver
+import ssl
+from datetime import datetime, timezone
+import builtwith
 
 def is_valid_domain(domain):
     ext = tldextract.extract(domain)
@@ -72,8 +75,54 @@ def get_dns_records(domain):
         except Exception as e:
             print(f"    {rtype}: No record found")
 
+def get_ssl_info(domain):
+    try:
+        ctx = ssl.create_default_context()
+        with ctx.wrap_socket(socket.socket(), server_hostname=domain) as s:
+            s.settimeout(5)
+            s.connect((domain, 443))
+            cert = s.getpeercert()
 
+        exp_date = datetime.strptime(cert['notAfter'], "%b %d %H:%M:%S %Y %Z")
+        exp_date = exp_date.replace(tzinfo=timezone.utc)  # make it timezone-aware
+        remaining = exp_date - datetime.now(timezone.utc)
 
+        print("\n[+] SSL Certificate Information:")
+        print(f"    Issuer       : {dict(x[0] for x in cert['issuer'])['organizationName']}")
+        print(f"    Subject      : {dict(x[0] for x in cert['subject'])['commonName']}")
+        print(f"    Expiration   : {exp_date}")
+        print(f"    Days Left    : {remaining.days}")
+    except Exception as e:
+        print(f"[!] Could not fetch SSL certificate: {e}")
+
+def get_technologies_used(domain):
+    try:
+        print("\n[+] Technology Fingerprinting (BuiltWith):")
+        tech = builtwith.parse(f"https://{domain}")
+        for category, technologies in tech.items():
+            print(f"    {category}: {', '.join(technologies)}")
+    except Exception as e:
+        print(f"[!] Could not fingerprint technologies: {e}")
+
+def get_sub_domains(domain):
+    try:
+        sub = ['ftp', 'www', 'blog', 'test', 'dev', 'api']
+        found = []
+
+        for i in sub:
+            subdomain = f"{sub}.{domain}"
+            try:
+                ip = socket.gethostbyname(subdomain)
+                print(f"    {subdomain} -> {ip}")
+                found.append(subdomain)
+            except socket.gaierror:
+                continue
+        
+        if not found:
+            print("    [!] No Common subdomains found")
+    except Exception as e:
+        print(e)
+    
 def main():
     raw_domain = input("Enter the domain Name(eg. website.com ): ")
     valid, domain = is_valid_domain(raw_domain)
@@ -99,6 +148,14 @@ def main():
     print(f"\n[+] Fetching DNS Records")
     get_dns_records(domain)
 
+    print(f"\n[+] Fetching SSL Certificate Details")
+    get_ssl_info(domain)
+
+    print(f"\n[+]Fetching Technologies Used")
+    get_technologies_used(domain)
+
+    print(f"\n[+]Subdomain Enumeration")
+    get_sub_domains(domain)
 
 if __name__ == "__main__":
     main()
