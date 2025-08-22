@@ -84,7 +84,7 @@ def get_ssl_info(domain):
             cert = s.getpeercert()
 
         exp_date = datetime.strptime(cert['notAfter'], "%b %d %H:%M:%S %Y %Z")
-        exp_date = exp_date.replace(tzinfo=timezone.utc)  # make it timezone-aware
+        exp_date = exp_date.replace(tzinfo=timezone.utc) 
         remaining = exp_date - datetime.now(timezone.utc)
 
         print("\n[+] SSL Certificate Information:")
@@ -122,6 +122,25 @@ def get_sub_domains(domain):
             print("    [!] No Common subdomains found")
     except Exception as e:
         print(e)
+        
+def get_banner(domain):
+    try:
+        url = f"https://{domain}"
+        response = requests.get(url, timeout=5)
+
+        print(f"[+] Banner for {domain}:\n")
+        print(f"HTTP/{response.raw.version} {response.status_code} {response.reason}")
+
+        for header, value in response.headers.items():
+            print(f"{header}: {value}")
+        
+        if "<title>" in response.text.lower():
+            start = response.text.lower().find("<title>") + 7
+            end = response.text.lower().find("</title>", start)
+            title = response.text[start:end].strip()
+            print(f"\n[+] Page Title: {title}")
+    except requests.exceptions.RequestException as e:
+        print(f"[-] Could not grab banner from {domain}: {e}")
     
 def main():
     raw_domain = input("Enter the domain Name(eg. website.com ): ")
@@ -156,6 +175,9 @@ def main():
 
     print(f"\n[+]Subdomain Enumeration")
     get_sub_domains(domain)
+
+    print(f"\n[+]Banner0 Enumeration")
+    get_banner(domain)
 
 if __name__ == "__main__":
     main()
